@@ -31,24 +31,33 @@ module Hypertemplate
   module Hook
     module Rails
 
-      class Hypertemplate < ::ActionView::TemplateHandler
-        include ::ActionView::TemplateHandlers::Compilable
+      class Hypertemplate
 
-        def compile(template)
-          "@content_type_helpers = controller.hypertemplate_registry[self.response.content_type].helper; " +
-          "extend @content_type_helpers; " +
-          "extend Hypertemplate::Hook::Rails::Helpers; " +
-          "code_block = lambda { #{template.source} };" +
-          "builder = code_block.call; " +
-          "builder"
+        def supports_streaming?
+          true
+        end
+
+        def handles_encoding?
+          true
+        end
+
+        def call(template)
+          <<-RUBY
+            @content_type_helpers = controller.hypertemplate_registry[self.response.content_type].helper
+            extend @content_type_helpers
+            extend Hypertemplate::Hook::Rails::Helpers
+            code_block = lambda { #{template.source} }
+            builder = code_block.call
+            builder
+          RUBY
         end
       end
 
       module Rails3Adapter
         def _pick_partial_template(path) #:nodoc:
           return path unless path.is_a?(String)
-          prefix = controller_path unless path.include?(?/)
-          find_template(path, prefix, true).instance_eval do
+          prefix = lookup_context.prefixes unless path.include?(?/)
+          lookup_context.find(path, prefix, true).instance_eval do
             unless respond_to?(:path)
               def path; virtual_path end
             end
@@ -122,9 +131,10 @@ module Hypertemplate
         end
       end
 
-      registry.register_template_handler(:hyper, Hypertemplate)
-      registry.register_template_handler(:hypertemplate, Hypertemplate)
-      registry.register_template_handler(:tokamak, Hypertemplate)
+      hypertemplateHandler = Hypertemplate.new
+      registry.register_template_handler(:hyper, hypertemplateHandler)
+      registry.register_template_handler(:hypertemplate, hypertemplateHandler)
+      registry.register_template_handler(:tokamak, hypertemplateHandler)
 
     end
   end

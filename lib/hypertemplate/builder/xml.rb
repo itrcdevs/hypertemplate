@@ -65,8 +65,11 @@ module Hypertemplate
         end
       end
 
+      def []=(name, value)
+        @parent[name.to_s] = value.to_s
+      end
       def representation
-        @raw.to_xml
+        @raw.to_xml :encoding => 'UTF-8'
       end
 
     private
