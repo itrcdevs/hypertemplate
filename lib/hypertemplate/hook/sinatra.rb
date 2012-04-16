@@ -30,7 +30,7 @@ module Hypertemplate
       module ::Sinatra::Templates
 
         def tokamak(template, options={}, locals={})
-          hyler(template, options, locals)
+          hyper(template, options, locals)
         end
         
         def hyper(template, options={}, locals={})

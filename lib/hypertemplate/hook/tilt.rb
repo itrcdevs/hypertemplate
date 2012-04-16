@@ -3,34 +3,22 @@ require 'hypertemplate' unless defined? ::Hypertemplate
 module Hypertemplate
   module Hook
     module Tilt
-      
-      class HypertemplateTilt
-        
-        def initialize
-          @registry = Hypertemplate::Registry.new
-        end
-        
-        # unfortunately Tilt uses a global registry
-        def new(view = nil, line = 1, options = {}, &block)
-          HypertemplateTemplate.new(@registry, view, line,options, &block)
-        end
-        
-      end
 
-      class HypertemplateTemplate < ::Tilt::Template
-        
-        def initialize(registry, view = nil, line = 1,options = {}, &block)
-          super(view, line, options, &block)
-          @registry = registry
+      class HypertemplateTilt < ::Tilt::Template
+
+        self.default_mime_type = 'application/json'
+
+        def self.engine_initialized?
+          defined? ::Hook::Tilt::HypertemplateTilt
         end
-        
+
         def initialize_engine
           require_template_library 'hypertemplate'
         end
 
         def prepare
-          @media_type = options[:media_type] || @options[:media_type]
-          raise Hypertemplate::BuilderError.new("Content type required to build representation.") unless @media_type
+          #@media_type = options[:media_type] || @options[:media_type]
+          #raise Hypertemplate::BuilderError.new("Content type required to build representation.") unless @media_type
         end
 
         def precompiled_preamble(locals)
@@ -39,10 +27,15 @@ module Hypertemplate
             begin
               unless self.class.method_defined?(:hypertemplate_registry)
                 def hypertemplate_registry
-                  env['hypertemplate']
+                  Hypertemplate::Registry.new.tap do |registry|
+                    registry << Hypertemplate::Builder::Json
+                    registry << Hypertemplate::Builder::Xml
+                  end
                 end
               end
-              extend hypertemplate_registry[#{@media_type.inspect}].helper
+              @content_type_helpers = hypertemplate_registry["#{@options[:media_type]}"].helper
+              extend @content_type_helpers
+              extend Hypertemplate::Hook::Rails::Helpers
               #{local_assigns}
           RUBY
         end
@@ -58,9 +51,9 @@ module Hypertemplate
         end
       end
 
-      ::Tilt.register 'hypertemplate', HypertemplateTilt.new
-      ::Tilt.register 'tokamak', HypertemplateTilt.new
-      ::Tilt.register 'hyper', HypertemplateTilt.new
+      ::Tilt.register HypertemplateTilt, 'hypertemplate'
+      ::Tilt.register HypertemplateTilt, 'tokamak'
+      ::Tilt.register HypertemplateTilt, 'hyper'
 
     end
   end
